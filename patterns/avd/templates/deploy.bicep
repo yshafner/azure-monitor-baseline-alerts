@@ -2012,17 +2012,16 @@ resource resourceGroupAVDMetricsExisting 'Microsoft.Resources/resourceGroups@202
 } */
 
 // Deploy new automation account
-module automationAccount 'br/public:avm/res/automation/automation-account:0.11.0' = {
+module automationAccount 'carml/1.3.0/Microsoft.Automation/automationAccounts/deploy.bicep' = {
   name: 'c_AutomtnAcct-${AutomationAccountName}'
   scope: resourceGroup(ResourceGroupName)
   params: {
-    diagnosticSettings: [
-      { logCategoriesAndGroups: [{ category: 'JobLogs', enabled: true }] }
-      { logCategoriesAndGroups: [{ category: 'JobStreams', enabled: true }] }
+    diagnosticLogCategoriesToEnable: [
+      'JobLogs'
+      'JobStreams'
     ]
-
-    enableTelemetry: false
-    linkedWorkspaceResourceId: LogAnalyticsWorkspaceResourceId
+    enableDefaultTelemetry: false
+    diagnosticWorkspaceId: LogAnalyticsWorkspaceResourceId
     name: AutomationAccountName
     jobSchedules: !empty(StorageAccountResourceIds)
       ? [
@@ -2221,10 +2220,11 @@ module automationAccount 'br/public:avm/res/automation/automation-account:0.11.0
     tags: contains(Tags, 'Microsoft.Automation/automationAccounts')
       ? Tags['Microsoft.Automation/automationAccounts']
       : {}
-    managedIdentities: {systemAssigned: true}
+    systemAssignedIdentity: true
   }
   dependsOn: ResourceGroupCreate ? [resourceGroupAVDMetricsCreate] : [resourceGroupAVDMetricsExisting]
 }
+
 
 module roleAssignment_AutoAcctDesktopRead 'br/public:avm/ptn/authorization/resource-role-assignment:0.1.1' = [
   for RG in HostPoolInfo: if (!AllResourcesSameRG) {
@@ -2232,7 +2232,7 @@ module roleAssignment_AutoAcctDesktopRead 'br/public:avm/ptn/authorization/resou
     name: 'c_DsktpRead_${split(RG.colVMResGroup, '/')[6]}'
     params: {
       enableTelemetry: false
-      principalId: automationAccount.outputs.systemAssignedMIPrincipalId
+      principalId: automationAccount.outputs.systemAssignedPrincipalId
       roleName: 'Desktop Virtualization Reader'
       principalType: 'ServicePrincipal'
       resourceId: RG.colVMResGroup
@@ -2247,7 +2247,7 @@ module roleAssignment_AutoAcctDesktopRead 'br/public:avm/ptn/authorization/resou
 // module roleAssignment_AutoAcctDesktopReadSameRG 'carml/1.3.0/Microsoft.Authorization/roleAssignments/resourceGroup/deploy.bicep' =
 //   if (AllResourcesSameRG) {
 //     scope: resourceGroup(split(AVDResourceGroupId, '/')[4])
-//     name: 'c_DsktpRead_${split(AVDResourceGroupId, '/')[4]}'
+//     name: 'c_DsktpRead_${schnaged automationa ccountplit(AVDResourceGroupId, '/')[4]}'
 //     params: {
 //       enableDefaultTelemetry: false
 //       principalId: automationAccount.outputs.systemAssignedPrincipalId
@@ -2265,7 +2265,7 @@ module roleAssignment_LogAnalytics 'br/public:avm/ptn/authorization/resource-rol
   name: 'c_LogContrib_${split(LogAnalyticsWorkspaceResourceId, '/')[4]}'
   params: {
     enableTelemetry: false
-    principalId: automationAccount.outputs.systemAssignedMIPrincipalId
+    principalId: automationAccount.outputs.systemAssignedPrincipalId
     roleDefinitionId: '/providers/Microsoft.Authorization/roleDefinitions/${RoleAssignments.LogAnalyticsContributor.GUID}'
     principalType: 'ServicePrincipal'
     resourceId: LogAnalyticsWorkspaceResourceId
